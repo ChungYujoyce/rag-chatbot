@@ -89,11 +89,10 @@ def get_documents(input_dir):
     return documents
 
 
-def run_pipeline(documents, vector_store, llm, num_workers):
+def run_pipeline(documents, vector_store, num_workers):
     pipeline = IngestionPipeline(
         transformations=[
             SentenceSplitter(chunk_size=512, chunk_overlap=16),
-            # [TODO] TitleExtractor(llm=llm, num_workers=num_workers),
             InstructorEmbedding(model_name=EMBEDDING),
         ],
         vector_store=vector_store,
@@ -120,22 +119,13 @@ def main():
     # num_workers = min(4, num_cores)
     num_workers = 1
 
-    # llm = OpenAI(temperature=0.1, model=MODEL, max_tokens=1024)
-    # llm = OpenAILike(
-    #     model="llama3-8b-instruct", 
-    #     api_base="http://vllm:8000/v1", 
-    #     api_key="fake",
-    #     temperature=0.0,
-    # )
-    llm = None
-
     vector_store = create_chroma_vector_store("./chroma_db")
     documents = get_documents(input_dir)
     for doc in documents:
         doc.text = clean_text(doc.text)
 
     print("Starting ingestion pipeline")
-    run_pipeline(documents, vector_store, llm, num_workers)
+    run_pipeline(documents, vector_store, num_workers)
 
 
 if __name__ == "__main__":

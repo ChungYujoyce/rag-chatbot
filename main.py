@@ -3,19 +3,18 @@ import chainlit as cl
 import pickle
 from typing import List
 
-from llama_index.core import Settings, VectorStoreIndex,SimpleDirectoryReader, StorageContext, PromptTemplate
+from llama_index.core import Settings, VectorStoreIndex, SimpleDirectoryReader, StorageContext, PromptTemplate
 from llama_index.llms.openai_like import OpenAILike
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.embeddings.instructor import InstructorEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.tools import RetrieverTool
-from llama_index.core.retrievers import RouterRetriever
+from llama_index.core.retrievers import VectorIndexRetriever, BaseRetriever, RouterRetriever
+from llama_index.core.postprocessor import SentenceTransformerRerank
 
 from llama_index.retrievers.bm25 import BM25Retriever
-from llama_index.core.retrievers import VectorIndexRetriever
-from llama_index.core.retrievers import BaseRetriever
-from llama_index.core.postprocessor import SentenceTransformerRerank
+
 
 import chromadb
 import nltk
@@ -78,30 +77,28 @@ def load_chroma_vector_store(path):
 
 
 def clean_text(text: str) -> List[str]:
-        
-        # Convert text to lowercase
-        text = text.lower()
-        
-        # Remove stopwords from text using regex
-        stopwords_list = set(nltk.corpus.stopwords.words('english'))
-        stopwords_pattern = r'\b(?:{})\b'.format('|'.join(stopwords_list))
-        text = re.sub(stopwords_pattern, '', text)
+    text = text.lower()
+    
+    # Remove stopwords from text using regex
+    stopwords_list = set(nltk.corpus.stopwords.words('english'))
+    stopwords_pattern = r'\b(?:{})\b'.format('|'.join(stopwords_list))
+    text = re.sub(stopwords_pattern, '', text)
 
-        # Replace punctuation, newline, tab with space
-        text = re.sub(r'[,.!?|]|[\n\t]', ' ', text)
-        # Replace multiple spaces with single space
-        text = re.sub(r'\s+', ' ', text)
-        # remove # from markdown
-        text = re.sub(r'#+', '', text)
-        text = re.sub(r'<[^>]*>', '', text)
+    # Replace punctuation, newline, tab with space
+    text = re.sub(r'[,.!?|]|[\n\t]', ' ', text)
+    # Replace multiple spaces with single space
+    text = re.sub(r'\s+', ' ', text)
+    # remove # from markdown
+    text = re.sub(r'#+', '', text)
+    text = re.sub(r'<[^>]*>', '', text)
 
-        # remove from user query
-        text = re.sub(r'assistant', '', text)
-        text = re.sub(r'user', '', text)
-        
-        text = text.strip().split(" ")
-        text = [t for t in text if t != "-" and t != ""]
-        return text
+    # remove from user query
+    text = re.sub(r'assistant', '', text)
+    text = re.sub(r'user', '', text)
+    
+    text = text.strip().split(" ")
+    text = [t for t in text if t != "-" and t != ""]
+    return text
 
 
 def build_router_retriever_query_engine(index):
