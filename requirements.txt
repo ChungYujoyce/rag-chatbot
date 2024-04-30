@@ -1,0 +1,12 @@
+chainlit==1.0.500
+chromadb
+llama-hub
+llama-index
+llama-parse
+llama-index-core
+llama-index-vector-stores-chroma
+llama-index-embeddings-huggingface
+llama-index-llms-openai-like
+llama_index.embeddings.instructor
+llama-index-retrievers-bm25
+sentence-transformers==2.2.2
