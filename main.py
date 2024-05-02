@@ -9,13 +9,14 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.embeddings.instructor import InstructorEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.core.query_engine import RetrieverQueryEngine
-from llama_index.core.tools import RetrieverTool
 from llama_index.core.retrievers import VectorIndexRetriever, BaseRetriever, RouterRetriever
 from llama_index.core.postprocessor import SentenceTransformerRerank
+from llama_index.core.indices.query.query_transform.base import StepDecomposeQueryTransform
+
 
 from llama_index.retrievers.bm25 import BM25Retriever
 
-
+from chromadb.config import Settings
 import chromadb
 import nltk
 try:
@@ -31,11 +32,6 @@ LLM = OpenAILike(
         max_tokens=256,
     )
 
-# openai.api_key = os.environ.get("OPENAI_API_KEY")
-# pinecone_api_key = os.environ.get("PINECONE_API_KEY")
-
-# MODEL = os.getenv("MODEL", "gpt-4-0125-preview")
-# EMBEDDING = os.getenv("EMBEDDING", "text-embedding-3-large")
 SYS_PROMPT = PromptTemplate(
     """\
 <|begin_of_text|><|start_header_id|>system<|end_header_id|>
@@ -93,40 +89,12 @@ def clean_text(text: str) -> List[str]:
     text = re.sub(r'<[^>]*>', '', text)
 
     # remove from user query
-    text = re.sub(r'assistant', '', text)
+    text = re.sub(r'supergpt', '', text)
     text = re.sub(r'user', '', text)
     
     text = text.strip().split(" ")
     text = [t for t in text if t != "-" and t != ""]
     return text
-
-
-def build_router_retriever_query_engine(index):
-    vector_retriever = VectorIndexRetriever(index)
-    bm25_retriever = BM25Retriever.from_defaults(nodes=nodes, similarity_top_k=2)
-
-    retriever_tools = [
-        RetrieverTool.from_defaults(
-            retriever=vector_retriever,
-            description="Useful in most cases",
-        ),
-        RetrieverTool.from_defaults(
-            retriever=bm25_retriever,
-            description="Useful if searching about specific information",
-        ),
-    ]
-    router_retriever = RouterRetriever.from_defaults(
-        retriever_tools=retriever_tools,
-        llm=LLM,
-        select_multi=True,
-    )
-
-    query_engine = RetrieverQueryEngine.from_args(
-        retriever=router_retriever,
-        streaming=True,
-        text_qa_template=SYS_PROMPT,
-    )
-    return query_engine
 
 
 # Advanced - Hybrid Retriever + Re-Ranking
@@ -154,18 +122,18 @@ def hybrid_retriver_reranking_query_engine(index):
     vector_retriever = index.as_retriever(similarity_top_k=10)
     bm25_retriever = BM25Retriever.from_defaults(nodes=nodes, 
                                                 tokenizer=clean_text,
-                                                similarity_top_k=4)
+                                                similarity_top_k=10)
 
     hybrid_retriever = HybridRetriever(vector_retriever, bm25_retriever)
-    # step_decompose_transform = StepDecomposeQueryTransform(llm=LLM, verbose=True)
+    step_decompose_transform = StepDecomposeQueryTransform(llm=LLM, verbose=True)
     reranker = SentenceTransformerRerank(top_n=4, model="BAAI/bge-reranker-base")
 
     query_engine = RetrieverQueryEngine.from_args(
-        retriever=bm25_retriever,
-        # node_postprocessors=[reranker],
-        # llm=LLM,
+        retriever=hybrid_retriever,
+        node_postprocessors=[reranker],
+        llm=LLM,
         streaming=True,
-        # query_transform=step_decompose_transform,
+        query_transform=step_decompose_transform,
         text_qa_template=SYS_PROMPT,
     )
 
@@ -182,6 +150,7 @@ def load_context():
 
     index = VectorStoreIndex.from_vector_store(
         vector_store=vector_store,
+        embed_model=InstructorEmbedding(model_name="hkunlp/instructor-xl"),
     )
     return index
 
@@ -189,17 +158,14 @@ def load_context():
 @cl.on_chat_start
 async def start():
     index = load_context()
-
-    query_engine1 = build_router_retriever_query_engine(index)
-    query_engine2 = hybrid_retriver_reranking_query_engine(index)
-    
-    cl.user_session.set("query_engine", query_engine2)
+    query_engine = hybrid_retriver_reranking_query_engine(index)
+    cl.user_session.set("query_engine", query_engine)
 
     message_history = []
     cl.user_session.set("message_history", message_history)
 
     await cl.Message(
-        author="assistant", content="Hello! Im an AI assistant. How may I help you?"
+        author="SuperGPT", content="Hello! Im an AI assistant. How may I help you?"
     ).send()
 
 
@@ -212,34 +178,45 @@ async def set_sources(response, response_message):
         if sr.get_score() > 0:
             above_zero_nodes.append(sr)
 
+    pdfs = set()
+    elements = []
     for sr in above_zero_nodes:
         chroma_client = chromadb.PersistentClient("./chroma_db")
         chroma_collection = chroma_client.get_collection("test")
         node = chroma_collection.get(ids = sr.id_)
+        file_name = str(node["metadatas"][0]["file_name"])
+        pdfs.add(file_name)
         print("-" * 10, sr)
-        elements = [
+        elements.append(
             cl.Text(
-                name=str(node["metadatas"][0]["file_name"]) + str(count),
+                name=file_name + str(count),
                 content=f"{sr.node.text}",
                 display="side",
                 size="small",
             )
-        ]
-        response_message.elements = elements
-        label_list.append(str(node["metadatas"][0]["file_name"])+ str(count))
-        await response_message.update()
+        )
+        label_list.append(file_name+ str(count))
         count += 1
+
+    count = 1
+    
+    for pdf in pdfs:
+        elements.append(cl.Pdf(name=pdf, display="page", path=f"./data/{pdf}"))
+        count += 1
+    response_message.elements = elements
     response_message.content += "\n\nSources: " + ", ".join(label_list)
+    response_message.content += "\nSource pdfs: " + ", ".join(pdfs)
     await response_message.update()
 
 
+
 @cl.on_message
-async def main(user_message: cl.Message):
+async def main(user_message: cl.Message):    
     n_history_messages = 4
     query_engine = cl.user_session.get("query_engine")
     message_history = cl.user_session.get("message_history")
     prompt_template = ""
-    print(message_history)
+
     for past_message in message_history:
         prompt_template += CONVERSATION_PROMPT.format(
             role=past_message['author'],
@@ -252,12 +229,12 @@ async def main(user_message: cl.Message):
     ) 
     
     prompt_template += RESPONSE_PROMPT.format(
-        role='assistant',
+        role='SuperGPT',
     ) 
 
     response = await cl.make_async(query_engine.query)(prompt_template)
     
-    assistant_message = cl.Message(content="", author="assistant")
+    assistant_message = cl.Message(content="", author="SuperGPT")
     for token in response.response_gen:
         await assistant_message.stream_token(token)
     if response.response_txt:
@@ -265,7 +242,7 @@ async def main(user_message: cl.Message):
     await assistant_message.send()
 
     message_history.append({"author": "user", "content": user_message.content})
-    message_history.append({"author": "assistant", "content": assistant_message.content})
+    message_history.append({"author": "SuperGPT", "content": assistant_message.content})
     message_history = message_history[-n_history_messages:]
     cl.user_session.set("message_history", message_history)
 

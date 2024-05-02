@@ -34,18 +34,14 @@ from llama_index.core.extractors import (
 from llama_parse import LlamaParse
 
 load_dotenv()
-# openai.api_key = os.environ.get("OPENAI_API_KEY")
-# pinecone_api_key = os.environ.get("PINECONE_API_KEY")
 llama_parse_api_key = os.environ.get("LLAMA_PARSE_API_KEY")
-
-# MODEL = os.getenv("MODEL", "gpt-4-0125-preview")
 EMBEDDING = "hkunlp/instructor-xl"
 
 def create_chroma_vector_store(path):
     chroma_client = chromadb.PersistentClient(path)
-    if chroma_client.get_collection("test"):
-        chroma_client.delete_collection(name="test")
-    chroma_collection = chroma_client.create_collection("test")
+    # if chroma_client.get_collection("test"):
+    #     chroma_client.delete_collection(name="test")
+    chroma_collection = chroma_client.get_or_create_collection("test")
     vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
     return vector_store
 
