@@ -4,6 +4,12 @@ __pycache__/
 *$py.class
 .files/
 .chainlit/
+*.pickle
+chroma_db_v1/
+SOURCE_DOCUMENTS/
+api/chroma_db_upload/
+api/uploads/
+api/app.log
 
 # C extensions
 *.so
