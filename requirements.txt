@@ -9,4 +9,6 @@ llama-index-embeddings-huggingface
 llama-index-llms-openai-like
 llama-index-embeddings-instructor
 llama-index-retrievers-bm25
+llama-index-postprocessor-rankgpt-rerank
 sentence-transformers==2.2.2
+fastapi
