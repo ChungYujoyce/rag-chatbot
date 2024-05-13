@@ -13,9 +13,9 @@ from llama_index.postprocessor.rankgpt_rerank import RankGPTRerank
 from llama_index.core.retrievers import VectorIndexRetriever, BaseRetriever, RouterRetriever
 from llama_index.core.postprocessor import SentenceTransformerRerank
 from llama_index.retrievers.bm25 import BM25Retriever
-from llama_index.core.indices.query.query_transform.base import (
-    StepDecomposeQueryTransform,
-)
+# from llama_index.core.indices.query.query_transform.base import (
+#     StepDecomposeQueryTransform,
+# )
 
 import argparse
 
@@ -25,7 +25,6 @@ parser.add_argument('-w', help='w')
 parser.add_argument('run', help='run')
 args = parser.parse_args()
 
-from chromadb.config import Settings
 import chromadb
 import nltk
 try:
@@ -33,13 +32,18 @@ try:
 except LookupError:
     nltk.download('stopwords')
 
+from nltk.stem import PorterStemmer
+from nltk.tokenize import word_tokenize
+ 
+ps = PorterStemmer()
+
 
 LLM = OpenAILike(
         model="llama3-8b-instruct", 
         api_base="http://vllm:8000/v1", 
         api_key="fake",
         temperature=0.0,
-        max_tokens=256,
+        max_tokens=512,
     )
 
 
@@ -56,7 +60,7 @@ Context information is below.
 ---------------------
 {context_str}
 ---------------------
-Given the context information and not prior knowledge, answer the query.<|eot_id|>
+Given the context information and not prior knowledge, answer the query as concise as possible..<|eot_id|>
 {query_str}\
 """
 )
@@ -67,10 +71,20 @@ DB_PATH = "./chroma_db_v1"
 chroma_client = chromadb.PersistentClient(DB_PATH)
 chroma_collection = chroma_client.get_collection("test_v1")
 VECTOR_STORE = ChromaVectorStore(chroma_collection=chroma_collection)
+Settings.llm = LLM
+Settings.embed_model = EMBEDDING
+Settings.num_output = 512
+Settings.context_window = 8192
 
-with open(f"./{DB_PATH}/nodes.pickle", 'rb') as f:
+index = VectorStoreIndex.from_vector_store(
+    vector_store=VECTOR_STORE,
+    embed_model=EMBEDDING,
+)
+
+with open(f"{DB_PATH}/nodes.pickle", 'rb') as f:
     global nodes
     nodes = pickle.load(f)
+
 
 def clean_text(text: str) -> List[str]:
     text = text.lower()
@@ -96,7 +110,22 @@ def clean_text(text: str) -> List[str]:
     
     text = text.strip().split(" ")
     text = [t for t in text if t != "-" and t != ""]
+    # words stemming
+    text = [ps.stem(t) for t in text]
     return list(set(text))
+
+
+bm25_retriever = BM25Retriever.from_defaults(nodes=nodes, tokenizer=clean_text, similarity_top_k=4)
+
+
+def get_query(input_text, start_tag, end_tag):
+    # Construct the regular expression pattern to match text between start_tag and end_tag
+    pattern = re.compile(rf'{re.escape(start_tag)}(.*?){re.escape(end_tag)}', re.DOTALL)
+
+    # Use re.findall() to find all occurrences of the pattern in the input text
+    matches = re.findall(pattern, input_text)
+
+    return matches
 
 
 # Advanced - Hybrid Retriever + Re-Ranking
@@ -120,56 +149,35 @@ class HybridRetriever(BaseRetriever):
         return all_nodes
 
 
-def hybrid_retriver_reranking_query_engine(index):
-    vector_retriever = index.as_retriever(similarity_top_k=5)
-
-    bm25_retriever = BM25Retriever.from_defaults(nodes=nodes, 
-                                                tokenizer=clean_text,
-                                                similarity_top_k=10)
-    bm25_retriever5 = BM25Retriever.from_defaults(nodes=nodes,
-                                                tokenizer=clean_text,
-                                                similarity_top_k=5)
-    bm25_retriever4 = BM25Retriever.from_defaults(nodes=nodes,
-                                                tokenizer=clean_text,
-                                                similarity_top_k=4)
-
-    hybrid_retriever = HybridRetriever(vector_retriever, bm25_retriever5) # 10 docs
-    step_decompose_transform = StepDecomposeQueryTransform(llm=LLM, verbose=True)
-    reranker = SentenceTransformerRerank(top_n=4, model="BAAI/bge-reranker-base")
+def query_engine_router(index, type_):
+    # vector_retriever = index.as_retriever(similarity_top_k=7)
+    # hybrid_retriever = HybridRetriever(vector_retriever, bm25_retriever4) # 10 docs
+    #step_decompose_transform = StepDecomposeQueryTransform(llm=LLM, verbose=True)
+    #reranker = SentenceTransformerRerank(top_n=4, model="BAAI/bge-reranker-base")
     rankergpt = RankGPTRerank(
             llm=LLM,
             top_n=4,
             verbose=True,
         )
 
-    query_engine = None
-    if args.port == 4100: # hybrid
-        print("hybrid")
+    query_engine, my_retriever = None, None
+    if type_ == "hybrid": # hybrid
+        vector_retriever = index.as_retriever(similarity_top_k=7)
+        hybrid_retriever = HybridRetriever(vector_retriever, bm25_retriever) # 10 docs
+
         query_engine = RetrieverQueryEngine.from_args(
             retriever=hybrid_retriever,
-            node_postprocessors=[reranker],
-            llm=LLM,
-            streaming=True,
-            #query_transform=step_decompose_transform,
-            text_qa_template=SYS_PROMPT,
-        )
-    elif args.port == 4101: # hybrid
-        print("bm25")
-        query_engine = RetrieverQueryEngine.from_args(
-            retriever=hybrid_retriever,
+            #node_postprocessors=[reranker],
             node_postprocessors=[rankergpt],
             llm=LLM,
             streaming=True,
-            #query_transform=step_decompose_transform,
             text_qa_template=SYS_PROMPT,
         )
-    elif args.port == 4102: # bm25
+    elif type_ == "bm25_spec": # bm25
         query_engine = RetrieverQueryEngine.from_args(
-            retriever=bm25_retriever4,
-            #node_postprocessors=[reranker],
+            retriever=bm25_retriever,
             llm=LLM,
             streaming=True,
-            #query_transform=step_decompose_transform,
             text_qa_template=SYS_PROMPT,
         )
 
@@ -180,7 +188,7 @@ def hybrid_retriver_reranking_query_engine(index):
 def load_context():
     Settings.llm = LLM
     Settings.embed_model = EMBEDDING
-    Settings.num_output = 4096
+    Settings.num_output = 512
     Settings.context_window = 8192
 
     index = VectorStoreIndex.from_vector_store(
@@ -192,10 +200,10 @@ def load_context():
 
 @cl.on_chat_start
 async def start():
-    index = load_context()
-    query_engine = hybrid_retriver_reranking_query_engine(index)
-
-    cl.user_session.set("query_engine", query_engine)
+    #index = load_context()
+    cl.user_session.set("counter", 0)
+    cl.user_session.set("query_engine_bm25_s", query_engine_router(index, "bm25_spec"))
+    cl.user_session.set("query_engine_hybrid", query_engine_router(index, "hybrid"))
 
     message_history = []
     cl.user_session.set("message_history", message_history)
@@ -216,7 +224,8 @@ async def set_sources(response, response_message):
 
     pdfs = set()
     elements = []
-    for sr in above_zero_nodes:
+    end = len(nodes) if len(nodes) < 4 else 4
+    for sr in above_zero_nodes[:end]:
         node = chroma_collection.get(ids = sr.id_)
         file_name = str(node["metadatas"][0]["file_name"])
         pdfs.add(file_name)
@@ -247,7 +256,8 @@ async def set_sources(response, response_message):
 async def main(user_message: cl.Message):
     index = load_context()
     n_history_messages = 8
-    query_engine = cl.user_session.get("query_engine")
+    counter = cl.user_session.get("counter")
+
     message_history = cl.user_session.get("message_history")
     prompt_template = ""
 
@@ -266,6 +276,21 @@ async def main(user_message: cl.Message):
         role='SuperGPT',
     )
 
+    user_query = get_query(prompt_template, '<|end_header_id|>', '<|eot_id|>')
+    user_query = user_query[counter][2:]
+    user_query = user_query.lower()
+    product_prefix = ['ars-', 'as-', 'asg-', 'ssg-', 'sys-', '4u', '1u', '2u', '5u', '8u', '10u']
+
+    query_engine = None
+    if any(prefix in user_query for prefix in product_prefix):
+        print("bm25s")
+        query_engine = cl.user_session.get("query_engine_bm25_s") # 4 docs
+    else:
+        print("hybrid")
+        query_engine = cl.user_session.get("query_engine_hybrid") # 10 docs
+
+
+
     response = await cl.make_async(query_engine.query)(prompt_template)
     
     assistant_message = cl.Message(content="", author="SuperGPT")
@@ -282,4 +307,6 @@ async def main(user_message: cl.Message):
 
     if response.source_nodes:
         await set_sources(response, assistant_message)
-        first_search = False
+
+    counter = counter+1 if counter != 8 else 0
+    cl.user_session.set("counter", counter)

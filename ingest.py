@@ -2,7 +2,6 @@ import os, re
 import openai
 import asyncio
 import pickle
-
 from dotenv import load_dotenv
 # from pinecone import Pinecone, PodSpec
 
@@ -19,9 +18,7 @@ from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.embeddings.instructor import InstructorEmbedding
 
-from chromadb.config import Settings
 import chromadb
-
 from llama_parse import LlamaParse
 
 load_dotenv()
@@ -32,7 +29,7 @@ def create_chroma_vector_store(path):
     chroma_client = chromadb.PersistentClient(path)
     # if chroma_client.get_collection("test"):
     #     chroma_client.delete_collection(name="test")
-    chroma_collection = chroma_client.get_or_create_collection("product_brief")
+    chroma_collection = chroma_client.get_or_create_collection("brochure")
     vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
     return vector_store
 
@@ -94,18 +91,18 @@ def run_pipeline(documents, vector_store, num_workers):
         k = vars(node)
         node.text = f"## {k['metadata']['file_name'].split('.')[0]}\n{k['text']}"
 
-    with open("./chroma_db_v3/nodes.pickle", 'wb') as f:
+    with open("./chroma_db_v6/nodes.pickle", 'wb') as f:
         pickle.dump(nodes, f)
 
 
 def main():
     print("Starting ingestion")
-    input_dir = "./brief/"
+    input_dir = "./output/"
     num_cores = os.cpu_count()
     # num_workers = min(4, num_cores)
     num_workers = 1
 
-    vector_store = create_chroma_vector_store("./chroma_db_v3")
+    vector_store = create_chroma_vector_store("./chroma_db_v6")
     documents = get_documents(input_dir)
     for doc in documents:
         doc.text = clean_text(doc.text)
