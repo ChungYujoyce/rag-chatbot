@@ -1,0 +1,293 @@
+   @import url('https://fonts.googleapis.com/css2?family=Play:wght@400;700&display=swap');
+
+    body {
+      background-image: linear-gradient(90deg, #09203f, #0057ff);
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    /* Set the input box size and center it */
+    #editInput {
+            width: 100%;
+            height: 200px; /* Increase height */
+            resize: vertical; /* Allow vertical resizing */
+            display: block;
+            margin: 0 auto; /* Center horizontally */
+            margin-bottom: 20px; /* Add space below input box */
+        }
+        
+    /* Style the save button */
+    .saveButton {
+        display: none;
+        float: right; /* Align to the right */
+    }
+    
+    /* Clearfix to ensure save button appears below input box */
+    .clearfix::after {
+        content: "";
+        display: table;
+        clear: both;
+    }
+
+    .container{
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      max-width: 1000px;
+      margin: 0 auto;
+    } 
+
+    .titlegpt{
+       font-size: 9vw;
+       color: white;
+       font-family: 'Play', sans-serif;
+    } 
+
+    .search {
+      width: 100%;
+      box-shadow:
+        inset 0 1px 1px rgba(0, 0, 0, 0.075),
+        0 0 8px rgba(0, 203, 110, 0.8);
+      background-color: #fff;
+      padding: 4px;
+      border-radius: 5px;
+    }
+
+    ::placeholder {
+      color: rgb(110, 104, 104);
+      opacity: 1;
+    }
+
+    .search-2 {
+      position: relative;
+      width: 100%;
+    }
+
+    .search-2 input {
+      height: 45px;
+      border: none;
+      width: 100%;
+      padding-left: calc(50px + 20px); 
+      padding-right: 100px;
+    }
+
+    .search-2 input:focus {
+      border-color: none;
+      box-shadow: none;
+      outline: none;
+    }
+
+    .search-2 .search-icon {
+      position: absolute;
+      top: 0;
+      right: 45px; /* Adjust position to align button properly */
+      height: 45px;
+      width: 40px; /* Adjust button width as needed */
+      border: none;
+      background-color: rgba(0, 203, 110, 0.8);
+      color: #fff;
+      border-radius: 4px;
+    }
+
+    /* Hover effect for the icon button */
+    .search-2 .search-icon:hover {
+      color: #07a84d; /* Change color on hover */
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .search-2 .upload-icon {
+      position: absolute;
+      top: 0;
+      right: 0; /* Adjust position to align button properly */
+      height: 45px;
+      width: 40px; /* Adjust button width as needed */
+      border: none;
+      background-color: rgba(0, 203, 110, 0.8);
+      color: #fff;
+      border-radius: 4px;
+    }
+
+    /* Hover effect for the icon button */
+    .search-2 .upload-icon:hover {
+      color: #07a84d; /* Change color on hover */
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .cancel_button {
+      border: none;
+      height: 45px;
+      background-color: gray;
+      color: #fff;
+      width: 90px;
+      border-radius: 4px;
+    }
+
+    .cancel_button:hover {
+      background: rgb(114, 113, 113);
+      color: #ffffff;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .default_button {
+      border: none;
+      height: 45px;
+      background-color: rgba(0, 203, 110, 0.8);
+      color: #fff;
+      width: 90px;
+      border-radius: 4px;
+    }
+
+    .reviseButton {
+      border: none;
+      height: 45px;
+      background-color: rgba(0, 203, 110, 0.8);
+      color: #fff;
+      width: 90px;
+      border-radius: 4px;
+    }
+    .deleteButton {
+      border: none;
+      height: 45px;
+      background-color: rgba(0, 203, 110, 0.8);
+      color: #fff;
+      width: 90px;
+      border-radius: 4px;
+    }
+    .saveButton {
+      border: none;
+      height: 45px;
+      background-color: rgba(0, 203, 110, 0.8);
+      color: #fff;
+      width: 90px;
+      border-radius: 4px;
+    }
+
+    .reviseButton:hover {
+      background: rgba(0, 203, 110, 0.8);
+      color: #ffffff;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .deleteButton:hover {
+      background: rgba(0, 203, 110, 0.8);
+      color: #ffffff;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .saveButton:hover {
+      background: rgba(0, 203, 110, 0.8);
+      color: #ffffff;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .upload_button:hover {
+      background: rgba(0, 203, 110, 0.8);
+      color: #ffffff;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .tutorial-icon {
+      position: absolute;
+      left: 1px;
+      top: 0px;
+      height: 45px;
+      width: 40px;
+      border: none;
+      background-color: rgba(0, 203, 110, 0.8);
+      color: #fff;
+      border-radius: 4px;
+    }
+
+    .tutorial-icon:hover {
+      color: #07a84d; /* Change color on hover */
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .form-control:focus {
+      border-color: #1a700a;
+      box-shadow:
+        inset 0 1px 1px rgba(0, 0, 0, 0.075),
+        0 0 8px rgba(7, 222, 189, 0.6);
+    }
+
+    @media (max-width: 800px) {
+      .search-2 i {
+        left: 4px;
+      }
+
+      .search-2 input {
+        padding-left: 10px;
+      }
+
+      .search-2 button {
+        height: 37px;
+        top: 5px;
+      }
+
+      .search-2 .tutorial_button {
+        height: 37px;
+        top: 5px;
+      }
+
+      .search-2 .upload_button {
+        height: 37px;
+        top: 5px;
+      }
+
+      .search-2 input {
+        height: 45px;
+        border: none;
+        width: 100%;
+        padding-left: calc(50px + 20px);
+        padding-right: 100px;
+      }
+
+      .default_button {
+        height: 37px;
+        width: 55px;
+      }
+
+      .cancel_button {
+        height: 37px;
+        width: 55px;
+      }
+
+      .reviseButton {
+        height: 37px;
+        width: 55px;
+      }
+
+      .deleteButton {
+        height: 37px;
+        width: 55px;
+      }
+
+      .saveButton {
+        height: 37px;
+        width: 55px;
+      }
+
+    }
+
+    .accordion-button:focus {
+      z-index: 3;
+      border-color: rgba(0, 203, 110, 0.8);
+      box-shadow: 0 0 0 0.25rem rgba(153, 50, 168, 0.25);
+    }
+
+    .accordion-button:not(.collapsed) {
+      color:rgba(0, 203, 110, 0.8);
+      background-color: #1a700a;
+      box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.125);
+    }
