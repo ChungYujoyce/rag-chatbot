@@ -18,8 +18,11 @@ API_HOST = "http://localhost:4105/api"
 # SOURCE_DOCUMENTS
 source_path = os.path.join(os.path.dirname(__file__), '..', './SOURCE_DOCUMENTS')
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', './chroma_db_v1')
+DB_PATH_DS = os.path.join(os.path.dirname(__file__), '..', './chroma_db_v1_ds')
 chroma_client = chromadb.PersistentClient(DB_PATH)
+chroma_client2 = chromadb.PersistentClient(DB_PATH_DS)
 DB = chroma_client.get_collection("test_v1")
+DB_DS = chroma_client2.get_collection("test_v1")
 
 Bootstrap(app)
 
@@ -103,6 +106,7 @@ def save_document_route():
             with request_lock:
                 results = DB.get(where={"file_name": f"{filename}"})
             if len(results["ids"]) > 0:
+                print(results["ids"])
                 print("Document already exists. Skipping...")
                 return "Document already exists. Skipping...", 200
             else:
@@ -116,7 +120,20 @@ def save_document_route():
                 file.save(file_path)
                 # Perform data processing on the file
                 text_nodes = process_pipeline(folder_path, DB_PATH)
+
+                # update main pickle
                 update_nodes("", text_nodes, DB_PATH, "add")
+
+                # update datasheet pickle additionally if it's a product datasheet
+                product_prefix = ['ars-', 'as-', 'asg-', 'ssg-', 'sys-']
+                if any(prefix in filename for prefix in product_prefix):
+                    print("add ds")
+                    update_nodes("", text_nodes, DB_PATH_DS, "add")
+                    for text_node in text_nodes:
+                        DB_DS.add(ids=text_node.id_,
+                                metadatas=text_node.metadata,
+                                documents=text_node.text,
+                                embeddings=text_node.embedding)
 
                 for text_node in text_nodes:
                     DB.add(ids=text_node.id_,
@@ -145,15 +162,26 @@ def run_update():
 
         revise_text = revise_result.strip()
         revise_vector = EMBEDDING._get_text_embedding(revise_text)
-        with request_lock:
-            DB.update(ids=_id, documents=revise_text, embeddings=revise_vector)
 
-        # update nodes
+        with request_lock:
+            DB.update(ids=_id, embeddings=revise_vector, documents=revise_text)
+            if DB_DS.get(ids=_id):
+                DB_DS.update(ids=_id, embeddings=revise_vector, documents=revise_text)
+
+        data = DB.get(ids=_id)
+        filename = data['metadatas'][0]['file_name']
+
+        # update pickle nodes
         new_nodes = {
-            'revise_text': revise_text,
+            'revise_text': f"## {filename.split('.')[0]}\n{revise_text}",
             'revise_vector': revise_vector
         }
         update_nodes(_id, new_nodes, DB_PATH, "edit")
+        # update ds pickle nodes
+        product_prefix = ['ars-', 'as-', 'asg-', 'ssg-', 'sys-']
+        if any(prefix in filename for prefix in product_prefix):
+            print("update ds")
+            update_nodes(_id, new_nodes, DB_PATH_DS, "edit")
 
         return "Script executed successfully", 200
     except Exception as e:
@@ -167,11 +195,21 @@ def run_delete():
         global request_lock  # Make sure to use the global lock instance
         _id = request.form.get("id")
         app.logger.info(_id)
-        
-        with request_lock:
-            DB.delete(ids=_id)
+
+        data = DB.get(ids=_id)
+        product_prefix = ['ars-', 'as-', 'asg-', 'ssg-', 'sys-']
+        filename = data['metadatas'][0]['file_name']
+        if any(prefix in filename for prefix in product_prefix):
+            print("delete ds")
+            update_nodes(_id, {}, DB_PATH_DS, "delete")
 
         update_nodes(_id, {}, DB_PATH, "delete")
+
+        with request_lock:
+            print(f"delete id:{_id}")
+            DB.delete(ids=_id)
+            if DB_DS.get(ids=_id):
+                DB_DS.delete(ids=_id)
 
         return "Script executed successfully", 200
     except Exception as e:

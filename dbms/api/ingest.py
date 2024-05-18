@@ -23,7 +23,8 @@ import chromadb
 
 from llama_parse import LlamaParse
 
-load_dotenv()
+dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+load_dotenv(dotenv_path)
 llama_parse_api_key = os.environ.get("LLAMA_PARSE_API_KEY")
 EMBEDDING = "hkunlp/instructor-xl"
 
@@ -85,7 +86,11 @@ def run_pipeline(documents, vector_store, num_workers):
         k = vars(doc)
         del k["metadata"]["last_modified_date"]
 
+    print(len(documents))
+
     nodes = pipeline.run(documents=documents, show_progress=True, num_workers=num_workers)
+
+    print(len(nodes))
 
     for node in nodes:
         k = vars(node)

@@ -66,7 +66,7 @@ function confirmDelete() {
 // Upload
 function openFileSelection() {
     const fileInput = document.getElementById("fileInput");
-    fileInput.accept = ".csv, .pdf, .txt, .doc, .docx";
+    fileInput.accept = ".csv, .pdf, .txt";
     fileInput.addEventListener("change", handleFileSelection);
     fileInput.click();
 }
