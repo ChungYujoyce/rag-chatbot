@@ -11,4 +11,5 @@ llama-index-embeddings-instructor
 llama-index-retrievers-bm25
 llama-index-postprocessor-rankgpt-rerank
 sentence-transformers==2.2.2
-fastapi
+flask_bootstrap
+flask
