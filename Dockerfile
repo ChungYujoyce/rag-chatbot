@@ -1,10 +1,16 @@
-# Use the chromadb/chroma image as the base image
-FROM python:3.11-slim-bookworm AS builder
-RUN pip install chromadb
+FROM nvcr.io/nvidia/pytorch:23.10-py3
+WORKDIR /workspace/
+RUN apt-get update && \
+ apt-get install -y poppler-utils
 
-# Expose port 8000
+COPY ./requirements.txt .
+RUN pip install --upgrade pip \
+  && pip install -r requirements.txt \
+  && pip install git+https://github.com/NVIDIA/TransformerEngine.git@stable \
 
-EXPOSE 80
+RUN pnpm install
+RUN git clone --branch custom-frontend https://github.com/ChungYujoyce/chainlit.git \
+    && cd chainlit/backend \
+    && pip install -e . \
+    && pnpm run buildUi
 
-# Run the command to start Chroma on port 8000
-CMD ["chroma", "run", "--path", "/chroma_db", "--host", "0.0.0.0", "--port", "8000"]
